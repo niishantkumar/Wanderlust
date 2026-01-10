@@ -5,7 +5,8 @@
     <form
       action="/listings/<%= listing._id %>?_method=PUT"
       method="POST"
-      class="mt-3"
+      class="mt-3 needs-validation"
+      novalidate
     >
       <div class="mb-3">
         <label for="title" class="form-label">Title</label>
@@ -15,7 +16,9 @@
           class="form-control"
           name="listing[title]"
           value="<%= listing.title %>"
+          required
         />
+        <div class="invalid-feedback">Please enter a title</div>
       </div>
 
       <div class="mb-3">
@@ -24,9 +27,11 @@
           name="listing[description]"
           id="description"
           class="form-control"
+          required
         >
 <%= listing.description %></textarea
         >
+        <div class="invalid-feedback">Please enter a short description</div>
       </div>
 
       <div class="mb-3">
@@ -51,7 +56,9 @@
               class="form-control"
               name="listing[price]"
               value="<%= listing.price %>"
+              required
             />
+            <div class="invalid-feedback">Price should be valid</div>
           </div>
         </div>
 
@@ -63,7 +70,9 @@
             class="form-control"
             name="listing[country]"
             value="<%= listing.country %>"
+            required
           />
+          <div class="invalid-feedback">Country name should be valid</div>
         </div>
       </div>
 
@@ -75,7 +84,9 @@
           class="form-control"
           name="listing[location]"
           value="<%= listing.location %>"
+          required
         />
+        <div class="invalid-feedback">Location should be valid</div>
       </div>
 
       <button class="btn add-btn mb-3 mt-1">Add</button>
