@@ -7,6 +7,7 @@
 
     <!--for css -->
     <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/rating.css" />
 
     <!-- for bootstrap -->
     <link
@@ -34,7 +35,8 @@
     />
   </head>
   <body>
-    <%- include("../includes/navbar.ejs") %>
+    <%- include("../includes/navbar.ejs") %> <%-
+    include("../includes/flash.ejs") %>
 
     <div class="container-fluid"><%- body %></div>
 

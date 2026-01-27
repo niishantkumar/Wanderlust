@@ -1,16 +1,78 @@
+if (process.env.NODE_ENV != "production") {
+    require('dotenv').config()
+}
+
 const express = require("express");
 const app = express();
 const path = require("path");
 const mongoose = require("mongoose");
 const methodOverride = require('method-override');
 const engine = require("ejs-mate");
-const wrapAsync = require("./utils/wrapAsync.js")
-const ExpressError = require("./utils/ExpressError.js")
+const ExpressError = require("./utils/ExpressError.js");
+const session = require("express-session");
+const { MongoStore } = require('connect-mongo');
+const flash = require("connect-flash");
+const passport = require("passport");
+const LocalStrategy = require("passport-local");
 
-const { ListingSchema } = require("./schema.js")
 
-const Listing = require("./models/listing.js");
-const { wrap } = require("module");
+const listingRouter = require("./Routes/listing.js");
+const reviewRouter = require("./Routes/review.js");
+const userRouter = require("./Routes/user.js");
+
+const dbUrl = process.env.ATLASDB_URL;
+
+const store = MongoStore.create({
+    mongoUrl: dbUrl,
+    crypto: {
+        secret: process.env.SESSION_SECRET,
+    },
+    touchAfter: 24 * 60 * 60,
+})
+
+store.on("error", () => {
+    console.log(error);
+})
+
+const sessionOptions = {
+    store,
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+    }
+};
+
+app.use(session(sessionOptions));
+app.use(flash());
+
+
+// requires the model with Passport-Local Mongoose plugged in
+const User = require('./models/user.js');
+const { error } = require('console');
+
+app.use(passport.initialize());
+app.use(passport.session());
+
+// use static authenticate method of model in LocalStrategy
+passport.use(new LocalStrategy(User.authenticate()));
+
+// use static serialize and deserialize of model for passport session support
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+
+
+app.use((req, res, next) => {
+    res.locals.success = req.flash("success");
+    res.locals.error = req.flash("error");
+    res.locals.user = req.user;
+    next();
+});
+
 
 app.engine('ejs', engine);
 app.set("view engine", "ejs");
@@ -34,108 +96,26 @@ main()
     });
 
 async function main() {
-    await mongoose.connect("mongodb://127.0.0.1:27017/wanderlust");
+    await mongoose.connect(dbUrl);
 }
 
-const validateListing = (request, response, next) => {
-    let { error } = ListingSchema.validate(request.body);
-
-    if (error) {
-        throw new ExpressError(404, error);
-    } else {
-        next();
-    }
-
-}
 
 //root route
 app.get("/", (request, response) => {
-    response.send("welcome to root route");
+    response.redirect("/listings");
 });
 
-//to show all listings
-app.get("/listings",
-    wrapAsync(async (request, response) => {
-        let listings = await Listing.find();
+//for listings
+app.use("/listings", listingRouter);
 
-        response.render("./listings/index.ejs", { listings });
-    })
-);
+//for reviews
+app.use("/listings/:id/reviews", reviewRouter);
 
-//new route
-app.get("/listings/new", (request, response) => {
-    response.render("./listings/new.ejs");
-});
-
-app.post("/listings",
-    validateListing,
-    wrapAsync(async (request, response) => {
-        let listing = request.body.listing;
-
-        const newListing = new Listing(listing);
-
-        await newListing.save();
-
-        response.redirect("/listings");
-    })
-);
-
-//to show a particular listing
-app.get("/listings/:id",
-    wrapAsync(async (request, response) => {
-        let { id } = request.params;
-
-        let listing = await Listing.findById(id);
-
-        if (!listing) throw new ExpressError(404, "Listing not found");
+//for users
+app.use("/", userRouter);
 
 
-        response.render("./listings/show.ejs", { listing });
-    }
-    ));
-
-//edit route
-app.get("/listings/:id/edit",
-    wrapAsync(async (request, response) => {
-        let { id } = request.params;
-
-        const listing = await Listing.findById(id);
-
-        response.render("./listings/edit.ejs", { listing });
-    })
-);
-
-//Update route
-app.put("/listings/:id",
-    validateListing,
-    wrapAsync(async (request, response) => {
-        let { id } = request.params;
-
-        const listing = request.body.listing;
-
-        let newListing = await Listing.findByIdAndUpdate(id, listing, {
-            runValidators: true,
-            new: true
-        });
-
-        console.log(newListing);
-
-        response.redirect(`/listings/${id}`);
-    })
-);
-
-app.delete("/listings/:id",
-    wrapAsync(async (request, response) => {
-        let { id } = request.params;
-
-        let deletedListing = await Listing.findByIdAndDelete(id);
-
-        console.log(deletedListing);
-
-        response.redirect("/listings");
-    })
-);
-
+//for any undeclared route
 app.all(/.*/, (req, res, next) => {
     next(new ExpressError(404, "Page not found"));
 });
